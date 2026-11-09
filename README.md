@@ -5,9 +5,9 @@
 A Docker-based setup for running llama.cpp server with GPU acceleration, SearXNG web search, and MCP tool servers — optimized for use as a local LLM provider for the Opencode coding assistant.
 
 ## Features
-- **GPU Acceleration**: Configured for NVIDIA GPUs with optimized settings
+- **GPU Acceleration**: Multi-GPU layer splitting with configurable tensor split
 - **Docker Compose**: Easy setup and management with auto-detection (GPU/CPU)
-- **Speculative Decoding**: Fit-based speculative decoding with configurable batch sizes
+- **Memory-fit Offload**: `--fit` auto-adjusts GPU offload and context to available VRAM
 - **Configurable Inference**: Sampling parameters, penalties, reasoning mode, and more via `.env`
 - **Jinja Chat Template**: Bundled chat template for improved model formatting
 - **Auto-generated Config**: Generate `opencode.json` from `.env` via script
@@ -53,14 +53,22 @@ Use `make copy_env` to create `.env` file with all settings to configure:
 | `PARALLEL`         | `1`                               | Context parallelism                             |
 | `CACHE_RAM`        | `4096`                            | KV cache memory budget in MiB                   |
 
-### Speculative Decoding (Fit)
-| Variable      | Default | Description                           |
-|---------------|---------|---------------------------------------|
-| `FIT`         | `on`    | Enable fit-based speculative decoding |
-| `FIT_TARGET`  | `256`   | Fit target sequence length            |
-| `FIT_CTX`     | `98304` | Fit context size                      |
-| `UBATCH_SIZE` | `256`   | Unbatched (speculative) batch size    |
-| `POLL_BATCH`  | `0`     | Poll batch size                       |
+### GPU Offload
+| Variable       | Default | Description                                                        |
+|----------------|---------|--------------------------------------------------------------------|
+| `GPU_LAYERS`   | `all`   | Layers to offload: `all`, `auto`, or a number                      |
+| `SPLIT_MODE`   | `layer` | How to split across GPUs: `layer`, `row`, `tensor`, `none`        |
+| `TENSOR_SPLIT` | `40,60` | Fraction per GPU (comma-separated, e.g. `40,60`)                   |
+| `MAIN_GPU`     | *(empty)* | Primary GPU index for intermediate results/KV                    |
+
+### Memory Fit
+| Variable      | Default | Description                                                    |
+|---------------|---------|----------------------------------------------------------------|
+| `FIT`         | `on`    | Auto-adjust unset offload/context args to fit device memory    |
+| `FIT_TARGET`  | `256`   | Target free-memory margin per device in MiB                    |
+| `FIT_CTX`     | `98304` | Minimum context size the fit pass may choose                   |
+| `UBATCH_SIZE` | `256`   | Physical batch size for prompt processing                      |
+| `POLL_BATCH`  | `0`     | Poll batch size                                                |
 
 ### Sampling & Penalties
 | Variable           | Default | Description                   |

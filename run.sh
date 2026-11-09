@@ -38,6 +38,22 @@ if [[ "${NO_MMAP}" == "true" ]]; then
     SERVER_CMD+=(--no-mmap)
 fi
 
+# GPU offload / multi-GPU split
+if [[ "${FORCE_CPU}" == "on" ]]; then
+    SERVER_CMD+=(--n-gpu-layers 0)
+else
+    SERVER_CMD+=(--n-gpu-layers "${GPU_LAYERS:-all}")
+    if [[ -n "${SPLIT_MODE}" ]]; then
+        SERVER_CMD+=(--split-mode "${SPLIT_MODE}")
+    fi
+    if [[ -n "${TENSOR_SPLIT}" ]]; then
+        SERVER_CMD+=(--tensor-split "${TENSOR_SPLIT}")
+    fi
+    if [[ -n "${MAIN_GPU}" ]]; then
+        SERVER_CMD+=(--main-gpu "${MAIN_GPU}")
+    fi
+fi
+
 if [[ "${FIT}" == "on" ]]; then
     SERVER_CMD+=(--fit "${FIT}")
     SERVER_CMD+=(--fit-target "${FIT_TARGET}")
@@ -104,6 +120,11 @@ echo "  Port (external):  ${PORT_EXTERNAL}"
 echo "  Context:    ${CTX_SIZE}"
 echo "  Flash Attn: ${FLASH_ATTN}"
 echo "  Threads:    ${THREADS}"
+if [[ "${FORCE_CPU}" == "on" ]]; then
+    echo "  Offload:    CPU only"
+else
+    echo "  Offload:    GPU layers=${GPU_LAYERS:-all} split=${SPLIT_MODE:-layer} tensor-split=${TENSOR_SPLIT:-auto}"
+fi
 echo "  Fit:        ${FIT:-off}"
 if [[ "${FIT}" == "on" ]]; then
     echo "  Fit Target: ${FIT_TARGET}"
@@ -113,5 +134,26 @@ echo "  Sampling:   temp=${TEMP:-1.0} top_p=${TOP_P:-1.0} top_k=${TOP_K:-0} min_
 echo "  Penalties:  presence=${PRESENCE_PENALTY:-0.0} repeat=${REPEAT_PENALTY:-1.0}"
 echo ""
 
-# Run the server
-exec "${SERVER_CMD[@]}"
+# Run the server in the background so we can pre-warm it before clients connect.
+"${SERVER_CMD[@]}" &
+SERVER_PID=$!
+
+trap 'kill -TERM "$SERVER_PID" 2>/dev/null; wait "$SERVER_PID"; exit 0' TERM INT
+
+# Wait for the HTTP server to come up.
+for _ in $(seq 1 120); do
+    if curl -sf "http://127.0.0.1:${PORT_INTERNAL}/health" >/dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
+
+# Pre-warm the GPU/CUDA kernels; otherwise the first client request pays a
+# one-time multi-token prompt-processing cost (tens of seconds on a cold
+# process). A single token is not enough, so use a short paragraph.
+WARMUP_PROMPT='The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog.'
+curl -sf "http://127.0.0.1:${PORT_INTERNAL}/completion" \
+    -H 'Content-Type: application/json' \
+    -d "{\"prompt\":\"${WARMUP_PROMPT}\",\"n_predict\":2,\"temperature\":0}" >/dev/null 2>&1 || true
+
+wait "$SERVER_PID"
