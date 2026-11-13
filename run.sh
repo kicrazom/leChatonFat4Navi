@@ -134,6 +134,10 @@ echo "  Sampling:   temp=${TEMP:-1.0} top_p=${TOP_P:-1.0} top_k=${TOP_K:-0} min_
 echo "  Penalties:  presence=${PRESENCE_PENALTY:-0.0} repeat=${REPEAT_PENALTY:-1.0}"
 echo ""
 
+# TEMP is already in SERVER_CMD as --temp. The ROCm/HIP runtime also reads TEMP
+# (as a temp-dir path) and segfaults in libamdhip64 when it holds "0.6".
+unset TEMP
+
 # Run the server in the background so we can pre-warm it before clients connect.
 "${SERVER_CMD[@]}" &
 SERVER_PID=$!

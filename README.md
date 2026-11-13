@@ -1,4 +1,52 @@
-# LeChatonFat - LLM Development Environment
+# LeChatonFat4Navi - LLM Development Environment (NVIDIA + AMD)
+
+> Fork of [grafiszti/leChatonFat](https://github.com/grafiszti/leChatonFat) (MIT, © Mateusz Choiński)
+> with AMD GPU support (ROCm and Vulkan). Built for the NaviMed sovereign-AI workstation.
+> Upstream NVIDIA behaviour is unchanged.
+
+## AMD GPUs (ROCm / Vulkan)
+
+Set in `.env`:
+
+```
+GPU_BACKEND=rocm            # or vulkan; auto = NVIDIA if present, else ROCm if /dev/kfd exists
+AMD_GPU0=/dev/dri/renderD128
+AMD_GPU1=/dev/dri/renderD129
+TENSOR_SPLIT=50,50          # two equal cards
+MODELS_DIR=/path/to/gguf    # host dir mounted at /models
+```
+
+List **only discrete GPUs** in `AMD_GPU0/1`. Exposing all of `/dev/dri` lets an iGPU join the split.
+Find the render nodes with `make check_gpu` (prints the PCI ID of each `renderD*`).
+
+Your user must be in the `video` and `render` groups; `make up` passes their GIDs to the container.
+
+### Measured on 2x Radeon AI PRO R9700 (gfx1201, 32 GB each)
+
+Qwen3.6-35B-A3B-UD-Q4_K_XL, default `.env` (ctx 98304, KV cache q4_0, flash attention),
+600-token prompt, 256 generated tokens, `cache_prompt=false`, 3 runs, 2026-11-13.
+
+| Backend | Image | Prompt processing | Generation |
+|---|---|---|---|
+| ROCm 7.2.1 | `llama.cpp:server-rocm` (30.8 GB) | ~2,650 tok/s | 76.9 tok/s |
+| Vulkan (RADV) | `llama.cpp:server-vulkan` (1.2 GB) | ~1,720 tok/s | 88.4 tok/s |
+
+ROCm reads long prompts faster; Vulkan generates faster and its image is 25x smaller.
+For an agent that re-reads a large context each turn, prompt processing usually dominates.
+
+### Known issue fixed here: `TEMP` crashes ROCm
+
+The sampling temperature variable `TEMP=0.6` is also read by the ROCm/HIP runtime and makes
+`llama-server` segfault in `libamdhip64` right after "loading model". `run.sh` now runs
+`unset TEMP` after the value is copied into `--temp`. NVIDIA was not affected.
+
+### Other changes vs upstream
+
+- `HF_REPO` default fixed to `unsloth/Qwen3.6-35B-A3B-GGUF` (the `-UD-GGUF` repo does not exist).
+- `MODELS_DIR` makes the model directory configurable (default `./models`).
+
+---
+
 
 ![img](img.png)
 
@@ -17,7 +65,7 @@ A Docker-based setup for running llama.cpp server with GPU acceleration, SearXNG
 
 ## Prerequisites
 - Docker and Docker Compose installed
-- NVIDIA GPU with drivers installed (optional, falls back to CPU)
+- NVIDIA GPU with drivers installed, or AMD GPU with ROCm/amdgpu (optional, falls back to CPU)
 - NVIDIA Container Toolkit (for GPU support)
 
 ## Quick Start
