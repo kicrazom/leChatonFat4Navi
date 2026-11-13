@@ -14,7 +14,7 @@ Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/l
 | Multi-GPU | layer split across discrete cards; iGPU kept out |
 | Default model | Qwen3.6-35B-A3B-UD-Q4_K_XL (22.4 GB GGUF) |
 | Measured | 2x R9700, generation: Qwen3.6-35B-A3B 76.9 / 88.4 tok/s, gpt-oss-20b 124.8 / 130.6 tok/s (ROCm / Vulkan) |
-| Agent | Opencode + MCP: fetch, SearXNG search, browser |
+| Agent | Opencode + MCP: fetch, SearXNG search, browser; tool calls tested with Bielik-11B-v3.1 (SGLang, vLLM) |
 
 ### Quick start (AMD)
 
@@ -76,10 +76,10 @@ Serves BF16 safetensors with SGLang instead of a GGUF with llama.cpp. Opencode i
 GPU_BACKEND=sglang
 SGLANG_IMAGE=sglang-rdna4:v0.5.18     # an SGLang build for your GPU
 SGLANG_MODELS_DIR=/path/to/hf-models
-SGLANG_MODEL=bielik-11b-v30-instruct   # folder under SGLANG_MODELS_DIR
-MODEL_NAME=bielik-11b-v3.0
+SGLANG_MODEL=bielik-11b-v31-instruct   # folder under SGLANG_MODELS_DIR
+MODEL_NAME=bielik-11b-v3.1
 SGLANG_TP=2
-SGLANG_TOOL_PARSER=                    # set for agent tool calls
+SGLANG_TOOL_PARSER=hermes              # needed for agent tool calls
 ```
 
 gfx1201 needs `--attention-backend triton --disable-cuda-graph --disable-custom-all-reduce`
