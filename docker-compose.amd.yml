@@ -1,0 +1,16 @@
+# AMD GPUs (ROCm or Vulkan). Used by `make up` instead of docker-compose.override.yml.
+# Only the render nodes from AMD_GPU0/AMD_GPU1 are exposed, so an iGPU stays out.
+services:
+  llama:
+    build:
+      args:
+        LLAMA_IMAGE: ${LLAMA_IMAGE:-ghcr.io/ggml-org/llama.cpp:server-rocm}
+    devices:
+      - /dev/kfd
+      - ${AMD_GPU0:-/dev/dri/renderD128}
+      - ${AMD_GPU1:-/dev/dri/renderD129}
+    group_add:
+      - "${VIDEO_GID:-44}"
+      - "${RENDER_GID:-992}"
+    security_opt:
+      - seccomp=unconfined

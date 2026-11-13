@@ -10,7 +10,7 @@ services:
       - "${PORT_EXTERNAL}:${PORT_INTERNAL}"
 
     volumes:
-      - ./models:/models
+      - ${MODELS_DIR:-./models}:/models
       - llama_cache:/root/.cache/llama.cpp
 
     env_file:

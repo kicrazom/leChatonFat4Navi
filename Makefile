@@ -9,19 +9,26 @@ up:
 		docker build --network=host -t lechatonfat-searxng-mcp mcps/searxng; \
 	}
 	@if [ -f .env ]; then \
-		FORCE_CPU=$$(grep '^FORCE_CPU=' .env | head -1 | cut -d'=' -f2); \
+		FORCE_CPU=$$(grep '^FORCE_CPU=' .env | head -1 | cut -d'=' -f2 | awk '{print $$1}'); \
+		BACKEND=$$(grep '^GPU_BACKEND=' .env | head -1 | cut -d'=' -f2 | awk '{print $$1}'); \
 	else \
-		FORCE_CPU=off; \
+		FORCE_CPU=off; BACKEND=auto; \
 	fi; \
-	if [ "$$FORCE_CPU" = "on" ] || ! (command -v nvidia-smi > /dev/null 2>&1 && docker info 2>/dev/null | grep -q "nvidia"); then \
-		echo "CPU runtime"; \
-		docker compose -f docker-compose.yml build; \
-		docker compose -f docker-compose.yml up -d; \
-	else \
-		echo "GPU detected - using NVIDIA runtime"; \
-		docker compose -f docker-compose.yml -f docker-compose.override.yml build; \
-		docker compose -f docker-compose.yml -f docker-compose.override.yml up -d; \
-	fi
+	[ -z "$$BACKEND" ] && BACKEND=auto; \
+	if [ "$$BACKEND" = "auto" ]; then \
+		if command -v nvidia-smi > /dev/null 2>&1 && docker info 2>/dev/null | grep -q "nvidia"; then BACKEND=nvidia; \
+		elif [ -e /dev/kfd ]; then BACKEND=rocm; \
+		else BACKEND=cpu; fi; \
+	fi; \
+	[ "$$FORCE_CPU" = "on" ] && BACKEND=cpu; \
+	export VIDEO_GID=$$(getent group video | cut -d: -f3) RENDER_GID=$$(getent group render | cut -d: -f3); \
+	case "$$BACKEND" in \
+		nvidia) echo "GPU backend: NVIDIA (CUDA)"; FILES="-f docker-compose.yml -f docker-compose.override.yml";; \
+		rocm|vulkan) echo "GPU backend: AMD ($$BACKEND)"; export LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-$$BACKEND; \
+			FILES="-f docker-compose.yml -f docker-compose.amd.yml";; \
+		*) echo "CPU runtime"; FILES="-f docker-compose.yml";; \
+	esac; \
+	docker compose $$FILES build && docker compose $$FILES up -d
 
 down:
 	docker compose down
@@ -45,6 +52,10 @@ check_docker:
 
 check_gpu:
 	@echo "Checking GPU setup..."
+	@if [ -e /dev/kfd ]; then \
+		echo "✓ AMD GPU (/dev/kfd) present — use GPU_BACKEND=rocm or vulkan"; \
+		for n in /sys/class/drm/renderD*; do echo "  $$(basename $$n): $$(grep PCI_ID $$n/device/uevent 2>/dev/null)"; done; \
+	fi
 	@if command -v nvidia-smi > /dev/null 2>&1; then \
 		echo "✓ NVIDIA driver is installed"; \
 		nvidia-smi --query-gpu=name,driver_version --format=csv,noheader | head -1; \
