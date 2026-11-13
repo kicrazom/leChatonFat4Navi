@@ -117,6 +117,20 @@ vLLM >= 0.24. On the backends here the built-in `hermes` parser works instead (t
 calls. Speed on 2x R9700, BF16, TP=2: 33.5 tok/s (SGLang), 22.4 tok/s (vLLM with the gfx1201
 env floor); count tokens from `usage`, because after EOS v3.1 emits tokens with no text.
 
+On llama.cpp (BF16 GGUF converted with `convert_hf_to_gguf.py`) the server exits with
+`lexer: unknown escape character \u`: the chat template writes a zero-width space as `\u200b`,
+which the llama.cpp Jinja lexer does not accept. Replace the escape with the literal character
+and point `CHAT_TEMPLATE` at the fixed file (it must be inside the container, e.g. next to the
+model under `/models`):
+
+```
+python3 -c "import re,sys;s=open(sys.argv[1]).read();open(sys.argv[2],'w').write(re.sub(r'\\\\u([0-9a-fA-F]{4})',lambda m:chr(int(m.group(1),16)),s))" \
+  bielik-11b-v31-instruct/chat_template.jinja  gguf/bielik-v31/bielik-v31-chat-template.llamacpp.jinja
+```
+
+With it, llama.cpp returns proper `tool_calls` (one call and two parallel calls) on ROCm and
+Vulkan. Speed, layer split over 2x R9700: ROCm 23.7 tok/s, Vulkan 24.9 tok/s.
+
 ### Model API is local-only by default
 
 `llama-server` runs without an API key. Upstream published it on `0.0.0.0:8001`, so anyone on the
