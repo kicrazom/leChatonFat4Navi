@@ -24,6 +24,7 @@ up:
 	export VIDEO_GID=$$(getent group video | cut -d: -f3) RENDER_GID=$$(getent group render | cut -d: -f3); \
 	case "$$BACKEND" in \
 		nvidia) echo "GPU backend: NVIDIA (CUDA)"; FILES="-f docker-compose.yml -f docker-compose.override.yml";; \
+		vllm) echo "GPU backend: vLLM (host venv)"; docker compose -f docker-compose.yml up -d searxng && bash scripts/vllm-host.sh start; exit $$?;; \
 		sglang) echo "GPU backend: SGLang (AMD, BF16)"; docker compose -f docker-compose.yml -f docker-compose.sglang.yml up -d searxng sglang; exit $$?;; \
 		rocm|vulkan) echo "GPU backend: AMD ($$BACKEND)"; export LLAMA_IMAGE=ghcr.io/ggml-org/llama.cpp:server-$$BACKEND; \
 			FILES="-f docker-compose.yml -f docker-compose.amd.yml";; \
@@ -32,7 +33,8 @@ up:
 	docker compose $$FILES build && docker compose $$FILES up -d
 
 down:
-	docker compose down
+	-bash scripts/vllm-host.sh stop
+	docker compose -f docker-compose.yml -f docker-compose.sglang.yml down
 
 # ---------------------------- Deployment validation ----------------------------
 validate:

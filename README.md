@@ -10,7 +10,7 @@ Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/l
 
 | | |
 |---|---|
-| Backends | llama.cpp: NVIDIA (CUDA), AMD ROCm, AMD Vulkan, CPU; SGLang: AMD BF16 |
+| Backends | llama.cpp: NVIDIA (CUDA), AMD ROCm, AMD Vulkan, CPU; SGLang: AMD BF16; vLLM: host venv, BF16/AWQ |
 | Multi-GPU | layer split across discrete cards; iGPU kept out |
 | Default model | Qwen3.6-35B-A3B-UD-Q4_K_XL (22.4 GB GGUF) |
 | Measured | 2x R9700, generation: Qwen3.6-35B-A3B 76.9 / 88.4 tok/s, gpt-oss-20b 124.8 / 130.6 tok/s (ROCm / Vulkan) |
@@ -91,6 +91,21 @@ is missing), so SGLang here means BF16.
 
 Measured (Bielik-11B-v3.0-Instruct BF16, 600-token prompt, 256 tokens, radix cache flushed
 before each run, 3 runs): TP=1 186 ms TTFT, 20.1 tok/s; TP=2 150 ms TTFT, 33.4 tok/s.
+
+### vLLM backend (`GPU_BACKEND=vllm`)
+
+Runs `vllm serve` from a host virtualenv as a `systemd --user` unit (`scripts/vllm-host.sh`),
+because on gfx1201 the validated stack is a host install (vLLM 0.19.0+rocm721) and the public
+vLLM ROCm images lag it. Serves BF16 or AWQ safetensors. Keys: `VLLM_BIN`, `VLLM_MODELS_DIR`,
+`VLLM_MODEL`, `VLLM_TP`, `VLLM_CTX`, `VLLM_GPU_UTIL`, `VLLM_TOOL_PARSER`, `VLLM_VISIBLE_DEVICES`.
+The script applies the gfx1201 environment floor (`VLLM_ROCM_USE_AITER=0`,
+`AMD_SERIALIZE_KERNEL=1`, `HIP_LAUNCH_BLOCKING=1`, iGPU hidden) and `--enforce-eager`.
+
+Measured (Bielik-11B-v3.0-Instruct BF16, TP=2, same prompt as above): 21.5 tok/s generation.
+TTFT 205 ms on the first run, 80 ms after; the prefix cache was not reset between runs
+(`/reset_prefix_cache` returned an error), so only the first TTFT is cold. The serialising
+debug variables of the env floor slow decoding; SGLang above runs without them, so the two
+numbers are not an engine-to-engine comparison.
 
 ### Model API is local-only by default
 
