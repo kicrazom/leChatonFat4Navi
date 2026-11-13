@@ -107,6 +107,16 @@ TTFT 205 ms on the first run, 80 ms after; the prefix cache was not reset betwee
 debug variables of the env floor slow decoding; SGLang above runs without them, so the two
 numbers are not an engine-to-engine comparison.
 
+### Tool calls with Bielik-11B-v3.1-Instruct
+
+Bielik v3.1 writes tool calls as `<tool_call>{"name": ..., "arguments": ...}</tool_call>` with
+extra whitespace after the opening tag. SpeakLeash's own parser is a vLLM plugin that needs
+vLLM >= 0.24. On the backends here the built-in `hermes` parser works instead (tested
+2026-11-13 with one call and with two parallel calls): `SGLANG_TOOL_PARSER=hermes` on SGLang
+0.5.18, `VLLM_TOOL_PARSER=hermes` on vLLM 0.19. The `qwen25` parser does not recognise the
+calls. Speed on 2x R9700, BF16, TP=2: 33.5 tok/s (SGLang), 22.4 tok/s (vLLM with the gfx1201
+env floor); count tokens from `usage`, because after EOS v3.1 emits tokens with no text.
+
 ### Model API is local-only by default
 
 `llama-server` runs without an API key. Upstream published it on `0.0.0.0:8001`, so anyone on the
