@@ -10,7 +10,7 @@ Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/l
 
 | | |
 |---|---|
-| Backends | NVIDIA (CUDA), AMD ROCm, AMD Vulkan, CPU fallback |
+| Backends | llama.cpp: NVIDIA (CUDA), AMD ROCm, AMD Vulkan, CPU; SGLang: AMD BF16 |
 | Multi-GPU | layer split across discrete cards; iGPU kept out |
 | Default model | Qwen3.6-35B-A3B-UD-Q4_K_XL (22.4 GB GGUF) |
 | Measured | 2x R9700, generation: Qwen3.6-35B-A3B 76.9 / 88.4 tok/s, gpt-oss-20b 124.8 / 130.6 tok/s (ROCm / Vulkan) |
@@ -66,6 +66,31 @@ lacked `routing_from_bitmatrix`; not re-tested since). llama.cpp does not use th
 
 ROCm reads long prompts faster; Vulkan generates faster and its image is 25x smaller.
 For an agent that re-reads a large context each turn, prompt processing usually dominates.
+
+### SGLang backend (`GPU_BACKEND=sglang`)
+
+Serves BF16 safetensors with SGLang instead of a GGUF with llama.cpp. Opencode is unchanged
+(same port, `MODEL_NAME` becomes the served model id). Set in `.env`:
+
+```
+GPU_BACKEND=sglang
+SGLANG_IMAGE=sglang-rdna4:v0.5.18     # an SGLang build for your GPU
+SGLANG_MODELS_DIR=/path/to/hf-models
+SGLANG_MODEL=bielik-11b-v30-instruct   # folder under SGLANG_MODELS_DIR
+MODEL_NAME=bielik-11b-v3.0
+SGLANG_TP=2
+SGLANG_TOOL_PARSER=                    # set for agent tool calls
+```
+
+gfx1201 needs `--attention-backend triton --disable-cuda-graph --disable-custom-all-reduce`
+(set in `docker-compose.sglang.yml`). There is no public SGLang image for RDNA4; the one used
+here was built locally from SGLang v0.5.18 with RDNA4 patches. Its `~/.cache/sglang` is
+root-owned while the server runs as `sglang`, so JIT kernels fail with `EACCES`; the compose
+file points `HOME` at `/tmp`. AWQ does not load on gfx1201 in this build (`gptq_marlin_repack`
+is missing), so SGLang here means BF16.
+
+Measured (Bielik-11B-v3.0-Instruct BF16, 600-token prompt, 256 tokens, radix cache flushed
+before each run, 3 runs): TP=1 186 ms TTFT, 20.1 tok/s; TP=2 150 ms TTFT, 33.4 tok/s.
 
 ### Model API is local-only by default
 

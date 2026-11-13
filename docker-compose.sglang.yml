@@ -1,0 +1,55 @@
+# SGLang backend (AMD, BF16 safetensors) instead of llama.cpp.
+# Used by `make up` when GPU_BACKEND=sglang: starts `sglang` + `searxng`, not `llama`.
+# Needs an SGLang image built for your GPU (gfx1201: see README, "SGLang backend").
+# The model API stays on PORT_EXTERNAL, so opencode.json does not change.
+services:
+  sglang:
+    image: ${SGLANG_IMAGE:-sglang-rdna4:v0.5.18}
+    container_name: sglang
+    restart: unless-stopped
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${PORT_EXTERNAL:-8001}:30000"
+    devices:
+      - /dev/kfd
+      - ${AMD_GPU0:-/dev/dri/renderD128}
+      - ${AMD_GPU1:-/dev/dri/renderD129}
+    group_add:
+      - "${VIDEO_GID:-44}"
+      - "${RENDER_GID:-992}"
+    shm_size: 16g
+    # The image runs as user `sglang` but ships /home/sglang/.cache/sglang owned by root,
+    # so JIT kernels fail with EACCES. The command points HOME at a writable /tmp dir;
+    # kernels are rebuilt on each container start.
+    volumes:
+      - ${SGLANG_MODELS_DIR:-./models}:/models:ro
+    environment:
+      SGLANG_USE_AITER: "0"
+      SGLANG_USE_AITER_AR: "0"
+      HIP_FORCE_DEV_KERNARG: "1"
+      HSA_FORCE_FINE_GRAIN_PCIE: "1"
+      HF_HUB_OFFLINE: "1"
+      MODEL_NAME: ${MODEL_NAME}
+      SGLANG_MODEL: ${SGLANG_MODEL}
+      SGLANG_TP: ${SGLANG_TP:-1}
+      SGLANG_CTX: ${SGLANG_CTX:-32768}
+      SGLANG_MEM_FRACTION: ${SGLANG_MEM_FRACTION:-0.85}
+      SGLANG_TOOL_PARSER: ${SGLANG_TOOL_PARSER:-}
+      SGLANG_PYTHON: ${SGLANG_PYTHON:-/opt/conda/envs/sglang-rdna4/bin/python}
+    # gfx1201: triton attention, no graph capture, no custom all-reduce (see README).
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - >-
+        mkdir -p /tmp/sglang-home && export HOME=/tmp/sglang-home &&
+        exec "$$SGLANG_PYTHON" -m sglang.launch_server
+        --model-path "/models/$$SGLANG_MODEL" --served-model-name "$$MODEL_NAME"
+        --host 0.0.0.0 --port 30000 --tp-size "$$SGLANG_TP"
+        --context-length "$$SGLANG_CTX" --mem-fraction-static "$$SGLANG_MEM_FRACTION"
+        --attention-backend triton --disable-cuda-graph --disable-custom-all-reduce
+        $${SGLANG_TOOL_PARSER:+--tool-call-parser "$$SGLANG_TOOL_PARSER"}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:30000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
