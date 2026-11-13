@@ -1,8 +1,30 @@
-# LeChatonFat4Navi - LLM Development Environment (NVIDIA + AMD)
+# leChatonFat4Navi
 
-> Fork of [grafiszti/leChatonFat](https://github.com/grafiszti/leChatonFat) (MIT, © Mateusz Choiński)
-> with AMD GPU support (ROCm and Vulkan). Built for the NaviMed sovereign-AI workstation.
-> Upstream NVIDIA behaviour is unchanged.
+**A local coding agent on AMD GPUs.** llama.cpp serves a GGUF model, SearXNG gives it web search,
+MCP servers give it tools, and Opencode drives it, all on your own machine with no external API.
+
+Fork of [grafiszti/leChatonFat](https://github.com/grafiszti/leChatonFat) (MIT, © Mateusz Choiński).
+The original targets NVIDIA; this fork adds **ROCm and Vulkan** backends and leaves the NVIDIA path unchanged.
+Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/lechat.html) workstation,
+2x Radeon AI PRO R9700.
+
+| | |
+|---|---|
+| Backends | NVIDIA (CUDA), AMD ROCm, AMD Vulkan, CPU fallback |
+| Multi-GPU | layer split across discrete cards; iGPU kept out |
+| Default model | Qwen3.6-35B-A3B-UD-Q4_K_XL (22.4 GB GGUF) |
+| Measured | 2x R9700: 76.9 tok/s (ROCm), 88.4 tok/s (Vulkan) generation |
+| Agent | Opencode + MCP: fetch, SearXNG search, browser |
+
+### Quick start (AMD)
+
+```
+make copy_env        # edit .env: GPU_BACKEND, AMD_GPU0/1, TENSOR_SPLIT, MODELS_DIR
+make check_gpu       # which renderD is which card
+make up
+make smoke_test
+make generate_opencode_config
+```
 
 ## AMD GPUs (ROCm / Vulkan)
 
