@@ -5,7 +5,7 @@ MCP servers give it tools, and Opencode drives it, all on your own machine with 
 
 Fork of [grafiszti/leChatonFat](https://github.com/grafiszti/leChatonFat) (MIT, © Mateusz Choiński).
 The original targets NVIDIA; this fork adds **ROCm and Vulkan** backends and leaves the NVIDIA path unchanged.
-Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/lechat.html) workstation,
+Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/lechat.html) workstation (see its Harness page),
 2x Radeon AI PRO R9700.
 
 | | |
@@ -65,9 +65,11 @@ For remote access set `BIND_ADDRESS` and `LLAMA_API_KEY` together, and give the 
 
 ### Known issue fixed here: `TEMP` crashes ROCm
 
-The sampling temperature variable `TEMP=0.6` is also read by the ROCm/HIP runtime and makes
-`llama-server` segfault in `libamdhip64` right after "loading model". `run.sh` now runs
-`unset TEMP` after the value is copied into `--temp`. NVIDIA was not affected.
+With the sampling temperature in the environment as `TEMP=0.6`, `llama-server` on ROCm segfaults in
+`libamdhip64` right after "loading model". Bisecting the container environment showed `TEMP` alone
+reproduces it; the HIP runtime likely reads `TEMP` as a temp-dir path. `run.sh` now runs
+`unset TEMP` after the value is copied into `--temp`. Upstream runs with this variable on NVIDIA;
+the NVIDIA path was not tested here.
 
 ### Other changes vs upstream
 

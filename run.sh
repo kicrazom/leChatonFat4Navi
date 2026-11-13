@@ -135,7 +135,7 @@ echo "  Penalties:  presence=${PRESENCE_PENALTY:-0.0} repeat=${REPEAT_PENALTY:-1
 echo ""
 
 # TEMP is already in SERVER_CMD as --temp. The ROCm/HIP runtime also reads TEMP
-# (as a temp-dir path) and segfaults in libamdhip64 when it holds "0.6".
+# (likely as a temp-dir path) and segfaults in libamdhip64 when it holds "0.6".
 unset TEMP
 
 # Run the server in the background so we can pre-warm it before clients connect.
