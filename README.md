@@ -13,7 +13,7 @@ Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/l
 | Backends | NVIDIA (CUDA), AMD ROCm, AMD Vulkan, CPU fallback |
 | Multi-GPU | layer split across discrete cards; iGPU kept out |
 | Default model | Qwen3.6-35B-A3B-UD-Q4_K_XL (22.4 GB GGUF) |
-| Measured | 2x R9700: 76.9 tok/s (ROCm), 88.4 tok/s (Vulkan) generation |
+| Measured | 2x R9700, generation: Qwen3.6-35B-A3B 76.9 / 88.4 tok/s, gpt-oss-20b 124.8 / 130.6 tok/s (ROCm / Vulkan) |
 | Agent | Opencode + MCP: fetch, SearXNG search, browser |
 
 ### Quick start (AMD)
@@ -52,6 +52,17 @@ Qwen3.6-35B-A3B-UD-Q4_K_XL, default `.env` (ctx 98304, KV cache q4_0, flash atte
 |---|---|---|---|
 | ROCm 7.2.1 | `llama.cpp:server-rocm` (30.8 GB) | ~2,650 tok/s | 76.9 tok/s |
 | Vulkan (RADV) | `llama.cpp:server-vulkan` (1.2 GB) | ~1,720 tok/s | 88.4 tok/s |
+
+gpt-oss-20b (`ggml-org/gpt-oss-20b-GGUF`, native MXFP4, 12.1 GB), same settings,
+`CHAT_TEMPLATE=` empty (the GGUF's own harmony template), `ignore_eos` to force 256 tokens:
+
+| Backend | Prompt processing | Generation |
+|---|---|---|
+| ROCm 7.2.1 | ~4,300 tok/s | 124.8 tok/s |
+| Vulkan (RADV) | ~2,580 tok/s | 130.6 tok/s |
+
+On vLLM 0.19 + ROCm 7.2 this model does not start on R9700 (`triton_kernels` lacks
+`routing_from_bitmatrix`); llama.cpp does not use that path.
 
 ROCm reads long prompts faster; Vulkan generates faster and its image is 25x smaller.
 For an agent that re-reads a large context each turn, prompt processing usually dominates.
