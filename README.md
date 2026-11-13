@@ -56,6 +56,13 @@ Qwen3.6-35B-A3B-UD-Q4_K_XL, default `.env` (ctx 98304, KV cache q4_0, flash atte
 ROCm reads long prompts faster; Vulkan generates faster and its image is 25x smaller.
 For an agent that re-reads a large context each turn, prompt processing usually dominates.
 
+### Model API is local-only by default
+
+`llama-server` runs without an API key. Upstream published it on `0.0.0.0:8001`, so anyone on the
+LAN (or VPN) could use the model. This fork binds it to `127.0.0.1` (`BIND_ADDRESS` in `.env`).
+For remote access set `BIND_ADDRESS` and `LLAMA_API_KEY` together, and give the client the same key
+(in `opencode.json`: `"apiKey": "{env:LLAMA_API_KEY}"` under the provider `options`).
+
 ### Known issue fixed here: `TEMP` crashes ROCm
 
 The sampling temperature variable `TEMP=0.6` is also read by the ROCm/HIP runtime and makes
