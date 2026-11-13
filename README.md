@@ -61,8 +61,8 @@ gpt-oss-20b (`ggml-org/gpt-oss-20b-GGUF`, native MXFP4, 12.1 GB), same settings,
 | ROCm 7.2.1 | ~4,300 tok/s | 124.8 tok/s |
 | Vulkan (RADV) | ~2,580 tok/s | 130.6 tok/s |
 
-On vLLM 0.19 + ROCm 7.2 this model does not start on R9700 (`triton_kernels` lacks
-`routing_from_bitmatrix`); llama.cpp does not use that path.
+As of 2026-04-26 this model did not start on R9700 with vLLM 0.19 + ROCm 7.2 (`triton_kernels`
+lacked `routing_from_bitmatrix`; not re-tested since). llama.cpp does not use that path.
 
 ROCm reads long prompts faster; Vulkan generates faster and its image is 25x smaller.
 For an agent that re-reads a large context each turn, prompt processing usually dominates.
