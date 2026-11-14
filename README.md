@@ -13,7 +13,7 @@ Built and measured on the [NaviMed-UMB](https://kicrazom.github.io/navimed-umb/l
 | Backends | llama.cpp: NVIDIA (CUDA), AMD ROCm, AMD Vulkan, CPU; SGLang: AMD BF16; vLLM: host venv, BF16/AWQ |
 | Multi-GPU | layer split across discrete cards; iGPU kept out |
 | Default model | Qwen3.6-35B-A3B-UD-Q4_K_XL (22.4 GB GGUF) |
-| Measured | 2x R9700, generation: Qwen3.6-35B-A3B 76.9 / 88.4 tok/s, gpt-oss-20b 124.8 / 130.6 tok/s (ROCm / Vulkan) |
+| Measured | 2x R9700, generation: Qwen3.6-35B-A3B 76.9 / 88.4 tok/s, gpt-oss-20b 124.8 / 130.6 tok/s, Qwen3.8-27B 27.8 / 26.6 tok/s (ROCm / Vulkan) |
 | Agent | Opencode + MCP: fetch, SearXNG search, browser; tool calls tested with Bielik-11B-v3.1 (SGLang, vLLM) |
 
 ### Quick start (AMD)
@@ -64,7 +64,16 @@ gpt-oss-20b (`ggml-org/gpt-oss-20b-GGUF`, native MXFP4, 12.1 GB), same settings,
 As of 2026-04-26 this model did not start on R9700 with vLLM 0.19 + ROCm 7.2 (`triton_kernels`
 lacked `routing_from_bitmatrix`; not re-tested since). llama.cpp does not use that path.
 
-ROCm reads long prompts faster; Vulkan generates faster and its image is 25x smaller.
+Qwen3.8-27B (`unsloth/Qwen3.8-27B-GGUF`, UD-Q4_K_XL, 17.7 GB, dense), same settings, 2026-11-14;
+tool calls (single and parallel) work on both backends:
+
+| Backend | Prompt processing | Generation |
+|---|---|---|
+| ROCm 7.2.1 | ~960 tok/s | 27.8 tok/s |
+| Vulkan (RADV) | ~575 tok/s | 26.6 tok/s |
+
+ROCm reads long prompts faster; Vulkan generates faster on the MoE models (level on the dense one)
+and its image is 25x smaller.
 For an agent that re-reads a large context each turn, prompt processing usually dominates.
 
 ### SGLang backend (`GPU_BACKEND=sglang`)
